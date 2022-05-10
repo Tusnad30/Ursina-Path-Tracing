@@ -3,9 +3,11 @@ from ursina.prefabs.first_person_controller import FirstPersonController
 
 from map import *
 
+per_vertex_path_tracing = False
+
 app = Ursina()
 
-map = Map()
+map = Map(per_vertex_path_tracing)
 
 player = FirstPersonController(position = (1.5, 0, 1.5), scale = 0.8)
 player.jump_height = 0

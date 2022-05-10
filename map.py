@@ -4,8 +4,11 @@ from direct.showbase.Loader import Loader
 from panda3d.core import SamplerState
 
 class Map(Entity):
-    def __init__(self):
-        frag = open("shaders/frag.glsl", "r"); vert = open("shaders/vert.glsl", "r")
+    def __init__(self, per_vertex):
+
+        if per_vertex == False: frag = open("shaders/frag.glsl", "r");            vert = open("shaders/vert.glsl", "r")
+        else:                   frag = open("shaders/frag_per_vertex.glsl", "r"); vert = open("shaders/vert_per_vertex.glsl", "r")
+
         shader = Shader(vertex = vert.read(), fragment = frag.read())
         frag.close(); vert.close()
 
