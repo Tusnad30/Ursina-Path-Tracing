@@ -69,8 +69,7 @@ RayHit castRay(vec3 dir, vec3 pos) {
 void main() {
     gl_Position = p3d_ModelViewProjectionMatrix * p3d_Vertex;
 
-    vec3 fragPos = vec3(p3d_ModelMatrix * p3d_Vertex);
-    vec3 vertPos = vec3(p3d_Vertex);
+    vec3 fragPos = round(vec3(p3d_ModelMatrix * p3d_Vertex) * 100.0) / 100.0;
     vec3 norm = normalize(p3d_Normal);
 
     vec3 albedo = vec3(0.0);
@@ -81,7 +80,7 @@ void main() {
         vec3 ray_light = vec3(0.0);
 
         for (int j = 0; j < numBounces; j++) {
-            vec3 rvec = GetRandomVec3(vertPos + j + i);
+            vec3 rvec = GetRandomVec3(fragPos + j + i);
 
             vec3 dir = mix(ray_norm, rvec, 0.49);
 
