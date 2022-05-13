@@ -2,10 +2,9 @@
 
 const int maxSteps = 50;
 const float stepSize = 0.2;
-const int numSamples = 256;
+const int numSamples = 512;
 const int numBounces = 3;
-
-const vec3 skyCol = vec3(5.0);
+const float maxLightIntensity = 2.0;
 
 in vec4 p3d_Vertex;
 in vec3 p3d_Normal;
@@ -15,24 +14,30 @@ out vec3 color;
 
 uniform mat4 p3d_ModelViewProjectionMatrix;
 uniform mat4 p3d_ModelMatrix;
-uniform sampler3D map_tex;
+
+uniform sampler3D map_a;
+uniform sampler3D map_e;
+uniform vec3 map_size;
+
 
 struct RayHit {
-    vec3 col, pos, norm;
-    bool out_bounds;
+    vec3 col, pos, norm, light;
 };
 
 
-vec3 sampleMapTex(vec3 pos) {
-    return texture(map_tex, vec3(pos.x / 6.0, (6.0 - pos.z) / 6.0, pos.y / 5.0)).xyz;
+vec3 sampleATex(vec3 pos) {
+    return texture(map_a, vec3(pos.x / map_size.x, (map_size.z - pos.z) / map_size.z, pos.y / map_size.y)).xyz;
+}
+float sampleETex(vec3 pos) {
+    return texture(map_e, vec3(pos.x / map_size.x, (map_size.z - pos.z) / map_size.z, pos.y / map_size.y)).x;
 }
 float random21(vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 vec3 GetRandomVec3(vec3 st) {
-    float rand = random21(st.yx);
-    float rand2 = random21(st.xz);
-    float rand3 = random21(st.zy);
+    float rand = random21(st.yx * st.z);
+    float rand2 = random21(st.xz * st.y);
+    float rand3 = random21(st.zy * st.x);
     vec3 r = vec3(rand, rand2, rand3) * 2.0 - 1.0;
     return normalize(r);
 }
@@ -47,19 +52,21 @@ RayHit castRay(vec3 dir, vec3 pos) {
     vec3 ray_dir = dir * stepSize;
     vec3 ray_pos = pos;
     RayHit ray_hit;
+    ray_hit.light = vec3(0.0);
 
     for (int i = 0; i < maxSteps; i++) {
         ray_pos += ray_dir;
 
-        vec3 tex_col = sampleMapTex(ray_pos);
+        vec3 a_tex_col = sampleATex(ray_pos);
 
-        if (tex_col != vec3(0, 0, 0)) {
-            ray_hit.col = tex_col;
+        if (a_tex_col != vec3(0, 0, 0)) {
+            ray_hit.col = a_tex_col;
             ray_hit.pos = ray_pos;
             ray_hit.norm = getRayNorm(ray_pos, ray_pos - ray_dir);
-            ray_hit.out_bounds = false;
 
-            if (ray_pos.y > 5.0) ray_hit.out_bounds = true;
+            float e_tex_val = sampleETex(ray_pos);
+            if (e_tex_val != 0.0) ray_hit.light = a_tex_col * e_tex_val * maxLightIntensity;
+
             break;
         }
     }
@@ -69,38 +76,39 @@ RayHit castRay(vec3 dir, vec3 pos) {
 void main() {
     gl_Position = p3d_ModelViewProjectionMatrix * p3d_Vertex;
 
-    vec3 fragPos = round(vec3(p3d_ModelMatrix * p3d_Vertex) * 100.0) / 100.0;
-    vec3 norm = normalize(p3d_Normal);
+    if (p3d_Color.w == 0.0) {
+        vec3 norm = normalize(p3d_Normal);
+        vec3 fragPos = round(vec3(p3d_ModelMatrix * p3d_Vertex) * 100.0) / 100.0;
 
-    vec3 albedo = vec3(0.0);
-    for (int i = 0; i < numSamples; i++) {
-        vec3 ray_pos = fragPos;
-        vec3 ray_norm = norm;
-        vec3 ray_albedo = vec3(0.0);
-        vec3 ray_light = vec3(0.0);
+        vec3 albedo = vec3(0.0);
+        for (int i = 0; i < numSamples; i++) {
+            vec3 ray_pos = fragPos;
+            vec3 ray_norm = norm;
+            vec3 ray_albedo = vec3(1.0);
+            vec3 ray_light = vec3(0.0);
 
-        for (int j = 0; j < numBounces; j++) {
-            vec3 rvec = GetRandomVec3(fragPos + j + i);
+            for (int j = 0; j < numBounces; j++) {
+                vec3 rvec = GetRandomVec3(fragPos + j + i);
 
-            vec3 dir = mix(ray_norm, rvec, 0.49);
+                vec3 dir = mix(ray_norm, rvec, 0.49);
 
-            RayHit ray = castRay(dir, ray_pos);
+                RayHit ray = castRay(dir, ray_pos);
 
-            ray_pos = ray.pos;
-            ray_norm = ray.norm;
-            ray_albedo += ray.col * pow(1.0 - (float(j) / float(numBounces)), 2.0);
-            
-            if (ray.out_bounds) {
-                ray_light = skyCol;
-                break;
+                ray_pos = ray.pos;
+                ray_norm = ray.norm;
+                ray_albedo *= ray.col;
+                
+                if (ray.light != vec3(0.0)) {
+                    ray_light = ray.light;
+                    break;
+                }
             }
+            albedo += (ray_albedo * ray_light);
         }
-        ray_albedo /= float(numBounces);
+        
+        albedo /= float(numSamples);
 
-        albedo += (ray_albedo * ray_light);
+        color = albedo * p3d_Color.xyz;
     }
-    
-    albedo /= float(numSamples);
-
-    color = albedo * vec3(p3d_Color);
+    else color = p3d_Color.xyz;
 }

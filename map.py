@@ -4,8 +4,7 @@ from direct.showbase.Loader import Loader
 from panda3d.core import SamplerState
 
 class Map(Entity):
-    def __init__(self, per_vertex):
-
+    def __init__(self, per_vertex, map_size):
         if per_vertex == False: frag = open("shaders/frag.glsl", "r");            vert = open("shaders/vert.glsl", "r")
         else:                   frag = open("shaders/frag_per_vertex.glsl", "r"); vert = open("shaders/vert_per_vertex.glsl", "r")
 
@@ -13,13 +12,13 @@ class Map(Entity):
         frag.close(); vert.close()
 
 
-        map = [PNMImage(), PNMImage(), PNMImage(), PNMImage(), PNMImage()]
+        map_a = [PNMImage() for i in range(map_size[1])]
+        for i, img in enumerate(map_a):
+            img.read(f"map/map_a_y{i}.tiff")
 
-        map[0].read("map/mapy0.png")
-        map[1].read("map/mapy1.png")
-        map[2].read("map/mapy2.png")
-        map[3].read("map/mapy3.png")
-        map[4].read("map/mapy4.png")
+        map_e = [PNMImage() for i in range(map_size[1])]
+        for i, img in enumerate(map_e):
+            img.read(f"map/map_e_y{i}.tiff")
 
 
         verts = []
@@ -29,7 +28,7 @@ class Map(Entity):
 
         trisNumb = 0
 
-        def makePlane(x, y, z, verts_coords, normal, color):
+        def makePlane(x, y, z, verts_coords, normal, color, emmisive):
             nonlocal trisNumb
 
             verts.append((verts_coords[0][0] + x, y + verts_coords[0][1], verts_coords[0][2] + z))
@@ -44,26 +43,31 @@ class Map(Entity):
             tris.append(2 + trisNumb)
             trisNumb += 4
 
-            colors.append(Vec4(color, 1.0))
-            colors.append(Vec4(color, 1.0))
-            colors.append(Vec4(color, 1.0))
-            colors.append(Vec4(color, 1.0))
+            colors.append(Vec4(color, emmisive))
+            colors.append(Vec4(color, emmisive))
+            colors.append(Vec4(color, emmisive))
+            colors.append(Vec4(color, emmisive))
             norms.append(normal)
             norms.append(normal)
             norms.append(normal)
             norms.append(normal)
 
         def getMapVal(x, y, z):
-            if x < 0 or x > 5 or z < 0 or z > 5 or y < 0 or y > 4:
+            if x < 0 or x > (map_size[0] - 1) or z < 0 or z > (map_size[2] - 1) or y < 0 or y > (map_size[1] - 1):
                 return 1
-            elif map[y].getXel(x, z) == (0, 0, 0):
+            elif map_a[y].getXel(x, z) == (0, 0, 0):
                 return 0
 
-        for y in range(5):
-            for x in range(6):
-                for z in range(6):
+        for y in range(map_size[1]):
+            for x in range(map_size[0]):
+                for z in range(map_size[2]):
                     if not getMapVal(x, y, z) == 0:
-                        cur_color = map[y].getXel(x, z)
+                        cur_color = map_a[y].getXel(x, z)
+
+                        emmisive = 0
+                        if map_e[y].getRed(x, z) != 0.0:
+                            emmisive = 1
+
                         px = getMapVal(x + 1, y, z)
                         nx = getMapVal(x - 1, y, z)
                         pz = getMapVal(x, y, z + 1)
@@ -72,24 +76,28 @@ class Map(Entity):
                         ny = getMapVal(x, y - 1, z)
 
                         if px == 0:
-                            makePlane(x, y, z, [(1,0,0), (1,0,1), (1,1,0), (1,1,1)], (1, 0, 0), cur_color)
+                            makePlane(x, y, z, [(1,0,0), (1,0,1), (1,1,0), (1,1,1)], (1, 0, 0), cur_color, emmisive)
                         if nx == 0:
-                            makePlane(x, y, z, [(0,0,1), (0,0,0), (0,1,1), (0,1,0)], (-1, 0, 0), cur_color)
+                            makePlane(x, y, z, [(0,0,1), (0,0,0), (0,1,1), (0,1,0)], (-1, 0, 0), cur_color, emmisive)
                         if pz == 0:
-                            makePlane(x, y, z, [(1,0,1), (0,0,1), (1,1,1), (0,1,1)], (0, 0, 1), cur_color)
+                            makePlane(x, y, z, [(1,0,1), (0,0,1), (1,1,1), (0,1,1)], (0, 0, 1), cur_color, emmisive)
                         if nz == 0:
-                            makePlane(x, y, z, [(0,0,0), (1,0,0), (0,1,0), (1,1,0)], (0, 0, -1), cur_color)
+                            makePlane(x, y, z, [(0,0,0), (1,0,0), (0,1,0), (1,1,0)], (0, 0, -1), cur_color, emmisive)
                         if py == 0:
-                            makePlane(x, y, z, [(0,1,0), (1,1,0), (0,1,1), (1,1,1)], (0, 1, 0), cur_color)
+                            makePlane(x, y, z, [(0,1,0), (1,1,0), (0,1,1), (1,1,1)], (0, 1, 0), cur_color, emmisive)
                         if ny == 0:
-                            makePlane(x, y, z, [(0,0,1), (1,0,1), (0,0,0), (1,0,0)], (0, -1, 0), cur_color)
+                            makePlane(x, y, z, [(0,0,1), (1,0,1), (0,0,0), (1,0,0)], (0, -1, 0), cur_color, emmisive)
 
         super().__init__(
             shader = shader,
             model = Mesh(vertices = verts, triangles = tris, colors = colors, normals = norms),
-            position = (0, 0, 0),
-            collider = "mesh"
+            position = (0, 0, 0)
         )
 
-        mapTex = Loader.load3DTexture(None, "map/mapy#.png", minfilter = SamplerState.FT_nearest, magfilter = SamplerState.FT_nearest)
-        self.set_shader_input("map_tex", mapTex)
+        map_tex_a = Loader.load3DTexture(None, "map/map_a_y#.tiff", minfilter = SamplerState.FT_nearest, magfilter = SamplerState.FT_nearest)
+        self.set_shader_input("map_a", map_tex_a)
+
+        map_tex_e = Loader.load3DTexture(None, "map/map_e_y#.tiff", minfilter = SamplerState.FT_nearest, magfilter = SamplerState.FT_nearest)
+        self.set_shader_input("map_e", map_tex_e)
+
+        self.set_shader_input("map_size", map_size)
