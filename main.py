@@ -3,23 +3,25 @@ from ursina.prefabs.first_person_controller import FirstPersonController
 
 from map import *
 
-per_vertex_path_tracing = False
+app = Ursina(borderless=False)
 
-map_size = (16, 6, 16)
+def main() -> None:
+    per_vertex_path_tracing = False
 
-app = Ursina()
+    map_size = (16, 6, 16)
 
-map = Map(per_vertex_path_tracing, map_size)
+    map = Map(per_vertex_path_tracing, map_size)
 
-player = FirstPersonController(position = (1.5, 0, 1.5), scale = 0.8)
-player.jump_height = 0
-camera.fov = 90
+    player = FirstPersonController(position = (1.5, 0, 1.5), scale = 0.8)
+    player.jump_height = 0
+    player.gravity = 0
+    player.y = 1
 
-window.borderless = False
-window.exit_button.enabled = False
+    camera.fov = 90
 
-def update():
-    player.world_position = (player.world_position.x, 1, player.world_position.z)
-    player.air_time = 0
+    window.exit_button.enabled = False
 
-app.run()
+    app.run()
+
+if __name__ == '__main__':
+    main()
